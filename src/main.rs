@@ -21,18 +21,32 @@ fn main() {
 
 fn handle_connection(mut stream: TcpStream) {
     let buf_reader = BufReader::new(&mut stream);
-    let request_line = buf_reader.lines().next().unwrap().unwrap();
-
-    println!("{}", request_line);
+    let mut lines = buf_reader.lines();
+    let request_line = lines.next().unwrap().unwrap();
     let (status_line, contents) = match &request_line[..] {
-        "GET / HTTP/1.1" => ("HTTP/1.1 200 OK", ""),
+        "GET / HTTP/1.1" => ("HTTP/1.1 200 OK", "".to_owned()),
+        "GET /user-agent HTTP/1.1" => {
+            // let user_agent = extract_user_agent(&mut lines);
+            let user_agent = lines
+                .find_map(|line| {
+                    let line = line.unwrap();
+                    if line.starts_with("User-Agent:") {
+                        Some(line["User-Agent:".len()..].trim().to_string())
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| "Unknown".to_string());
+            ("HTTP/1.1 200 OK", user_agent)
+        }
         _ if request_line.starts_with("GET /echo") => {
             let echo_value =
                 &request_line["GET /echo/".len()..request_line.len() - " HTTP/1.1".len()];
-            ("HTTP/1.1 200 OK", echo_value)
+            ("HTTP/1.1 200 OK", echo_value.to_owned())
         }
-        _ => ("HTTP/1.1 404 Not Found", ""),
+        _ => ("HTTP/1.1 404 Not Found", "".to_owned()),
     };
+
     let headers_text = format!(
         "Content-Type: text/plain\r\nContent-Length: {}\r\n",
         contents.len()
