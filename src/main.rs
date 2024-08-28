@@ -23,7 +23,7 @@ fn main() -> std::io::Result<()> {
                 println!("accepted new connection");
                 let router = Arc::clone(&router);
                 thread::spawn(move || {
-                    if let Err(e) = handle_connection2(stream, router) {
+                    if let Err(e) = handle_connection(stream, router) {
                         eprintln!("Error handling connection: {}", e);
                     }
                 });
@@ -37,7 +37,7 @@ fn main() -> std::io::Result<()> {
     Ok(())
 }
 
-fn handle_connection2(mut stream: TcpStream, router: Arc<Router>) -> std::io::Result<()> {
+fn handle_connection(mut stream: TcpStream, router: Arc<Router>) -> std::io::Result<()> {
     let mut reader = BufReader::new(&mut stream);
     let request = HttpRequest::parse(&mut reader)?;
     // println!("-----------");

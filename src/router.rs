@@ -6,7 +6,7 @@ use crate::{
 };
 
 pub enum RouteResponse {
-    Ok(Vec<u8>),
+    Ok(Vec<u8>, Option<String>),
     Created,
     NotFound,
     FileContent(Vec<u8>),
@@ -35,11 +35,19 @@ impl Router {
             if method == &request.method {
                 if let Some(path_params) = match_path(path, &request.path) {
                     return match handler.handle(request, &path_params) {
-                        RouteResponse::Ok(body) => HttpResponse::new(
-                            "HTTP/1.1 200 OK".to_string(),
-                            "text/plain".to_string(),
-                            body,
-                        ),
+                        RouteResponse::Ok(body, content_encoding) => {
+                            let mut response = HttpResponse::new(
+                                "HTTP/1.1 200 OK".to_string(),
+                                "text/plain".to_string(),
+                                body,
+                            );
+                            if let Some(encoding) = content_encoding {
+                                response
+                                    .headers
+                                    .add("Content-Encoding".to_string(), encoding);
+                            }
+                            response
+                        }
                         RouteResponse::Created => HttpResponse::new(
                             "HTTP/1.1 201 Created".to_string(),
                             "text/plain".to_string(),
@@ -91,7 +99,7 @@ fn match_path(route_path: &str, request_path: &str) -> Option<HashMap<String, St
 struct RootHandler;
 impl Handler for RootHandler {
     fn handle(&self, _request: &HttpRequest, _params: &HashMap<String, String>) -> RouteResponse {
-        RouteResponse::Ok(Vec::new())
+        RouteResponse::Ok(Vec::new(), None)
     }
 }
 
@@ -105,20 +113,28 @@ impl Handler for UserAgentHandler {
                 .unwrap_or("Unknown")
                 .as_bytes()
                 .to_vec(),
+            None,
         )
     }
 }
 
 struct EchoHandler;
 impl Handler for EchoHandler {
-    fn handle(&self, _request: &HttpRequest, params: &HashMap<String, String>) -> RouteResponse {
-        RouteResponse::Ok(
-            params
-                .get("message")
-                .unwrap_or(&"".to_string())
-                .as_bytes()
-                .to_vec(),
-        )
+    fn handle(&self, request: &HttpRequest, params: &HashMap<String, String>) -> RouteResponse {
+        let message = params.get("message").map(String::as_str).unwrap_or("");
+        let body = message.as_bytes().to_vec();
+
+        let accepts_gzip = request
+            .headers
+            .get("Accept-Encoding")
+            .map(|encoding| encoding.contains("gzip"))
+            .unwrap_or(false);
+
+        if accepts_gzip {
+            RouteResponse::Ok(body, Some("gzip".to_string()))
+        } else {
+            RouteResponse::Ok(body, None)
+        }
     }
 }
 

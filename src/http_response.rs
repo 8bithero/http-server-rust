@@ -4,9 +4,9 @@ use std::net::TcpStream;
 
 #[derive(Debug)]
 pub struct HttpResponse {
-    status_line: String,
-    headers: HttpHeaders,
-    body: Vec<u8>,
+    pub status_line: String,
+    pub headers: HttpHeaders,
+    pub body: Vec<u8>,
 }
 
 impl HttpResponse {
