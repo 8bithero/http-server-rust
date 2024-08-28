@@ -1,9 +1,9 @@
-use std::{collections::HashMap, env, fs, io::Write, path::PathBuf};
-
 use crate::{
     http_request::{HttpRequest, Method},
     http_response::HttpResponse,
 };
+use flate2::{write::GzEncoder, Compression};
+use std::{collections::HashMap, env, fs, io::Write, path::PathBuf};
 
 pub enum RouteResponse {
     Ok(Vec<u8>, Option<String>),
@@ -122,7 +122,6 @@ struct EchoHandler;
 impl Handler for EchoHandler {
     fn handle(&self, request: &HttpRequest, params: &HashMap<String, String>) -> RouteResponse {
         let message = params.get("message").map(String::as_str).unwrap_or("");
-        let body = message.as_bytes().to_vec();
 
         let accepts_gzip = request
             .headers
@@ -131,9 +130,13 @@ impl Handler for EchoHandler {
             .unwrap_or(false);
 
         if accepts_gzip {
-            RouteResponse::Ok(body, Some("gzip".to_string()))
+            let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+            encoder.write_all(message.as_bytes()).unwrap();
+            let compressed_body = encoder.finish().unwrap();
+
+            RouteResponse::Ok(compressed_body, Some("gzip".to_string()))
         } else {
-            RouteResponse::Ok(body, None)
+            RouteResponse::Ok(message.as_bytes().to_vec(), None)
         }
     }
 }
